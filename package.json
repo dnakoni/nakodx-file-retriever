@@ -1,0 +1,53 @@
+{
+    "name": "nakodx-retrieve-file",
+    "displayName": "NAKODX Retrieve File from Server",
+    "description": "Quickly retrieve Salesforce metadata files from server",
+    "version": "0.0.9",
+    "engines": {
+        "vscode": "^1.74.0"
+    },
+    "categories": [
+        "Extension Packs",
+        "Programming Languages"
+    ],
+        "repository": {
+        "url": "https://github.com/dnakoni/nakodx-file-retriever"
+    },
+    "activationEvents": [],
+    "main": "./out/extension.js",
+    "icon": "images/icon.png",
+    "author": "Daniel Nakonieczny",
+    "publisher": "daniel-nakonieczny",
+    "contributes": {
+        "commands": [
+            {
+                "command": "nakodx.retrieveFileFromServerCached",
+                "title": "NAKODX: Retrieve File from Server"
+            },
+            {
+                "command": "nakodx.deleteTypesCache",
+                "title": "NAKODX: Retrieve File from Server - Clear Types Cache"
+            },
+            {
+                "command": "nakodx.deleteItemsCache",
+                "title": "NAKODX: Retrieve File from Server - Clear Items Cache"
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src --ext ts",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/node": "^16.18.126",
+        "@types/vscode": "^1.74.0",
+        "@typescript-eslint/eslint-plugin": "^5.45.0",
+        "@typescript-eslint/parser": "^5.45.0",
+        "eslint": "^8.28.0",
+        "typescript": "^4.9.3"
+    }
+}
