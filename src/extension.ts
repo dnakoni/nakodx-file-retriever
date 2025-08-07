@@ -170,8 +170,8 @@ async function retrieveFileFromServer(useCache: boolean = true) {
             }
 
             // Step 5: Retrieve the selected file
-            progress.report({ message: `Retrieving ${selectedMetadataType}:${selectedItem}...` });
-            await retrieveSelectedFile(selectedMetadataType, selectedItem, token);
+            progress.report({ message: `Retrieving ${selectedMetadataType}:${selectedItem.name}...` });
+            await retrieveSelectedFile(selectedMetadataType, selectedItem.name, token);
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -450,7 +450,7 @@ function getMetadataItems(metadataType: string, token?: vscode.CancellationToken
     });
 }
 
-async function showMetadataItemQuickPick(metadataItems: any[], metadataType: string): Promise<string | undefined> {
+async function showMetadataItemQuickPick(metadataItems: any[], metadataType: string): Promise<{name: string, fileName: string | null} | undefined> {
     const items: vscode.QuickPickItem[] = metadataItems.map(item => ({
         label: item.fullName,
         description: item.fileName || '',
@@ -463,10 +463,17 @@ async function showMetadataItemQuickPick(metadataItems: any[], metadataType: str
         matchOnDetail: true
     });
 
-    return selectedItem?.label;
+    if (selectedItem) {
+        const originalItem = metadataItems.find(item => item.fullName === selectedItem.label);
+        return {
+            name: selectedItem.label,
+            fileName: originalItem?.fileName || null
+        };
+    }
+    return undefined;
 }
 
-function retrieveSelectedFile(metadataType: string, itemName: string, token?: vscode.CancellationToken): Promise<void> {
+async function retrieveSelectedFile(metadataType: string, itemName: string, token?: vscode.CancellationToken): Promise<void> {
     return new Promise((resolve, reject) => {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
@@ -475,7 +482,7 @@ function retrieveSelectedFile(metadataType: string, itemName: string, token?: vs
         }
 
         const metadataString = `${metadataType}:${itemName}`;
-        const process = child.exec(`sf project retrieve start --metadata "${metadataString}"`, {
+        const process = child.exec(`sf project retrieve start --metadata "${metadataString}" --json`, {
             maxBuffer: 1024 * 1024 * 10,
             cwd: workspaceFolder.uri.fsPath
         });
@@ -513,8 +520,42 @@ function retrieveSelectedFile(metadataType: string, itemName: string, token?: vs
                 return;
             }
 
-            vscode.window.showInformationMessage(`Successfully retrieved ${metadataType}:${itemName}`);
-            resolve();
+            try {
+                const result = JSON.parse(bufferOutData);
+                
+                if (result.status !== 0 || !result.result?.success) {
+                    reject(new Error(`Failed to retrieve file: ${result.result?.messages?.join(', ') || 'Unknown error'}`));
+                    return;
+                }
+
+                vscode.window.showInformationMessage(`Successfully retrieved ${metadataType}:${itemName}`);
+                
+                // Check if auto-open is enabled and open the file if so
+                const config = vscode.workspace.getConfiguration('nakodx-file-retriever');
+                const autoOpen = config.get<boolean>('autoOpenAfterDownload', true);
+                
+                if (autoOpen && result.result?.files && result.result.files.length > 0) {
+                    // Get the first file from the files array (excluding -meta.xml files)
+                    const firstFile = result.result.files.find((file: any) => !file.filePath.endsWith('-meta.xml')) || result.result.files[0];
+                    
+                    if (firstFile && firstFile.filePath) {
+                        const filePath = firstFile.filePath;
+
+                        if (fs.existsSync(filePath)) {
+                            vscode.workspace.openTextDocument(filePath).then(doc => {
+                                vscode.window.showTextDocument(doc);
+                            }, (err: any) => {
+                                console.error('Failed to open file:', err);
+                            });
+                        }
+                    }
+                }
+                
+                resolve();
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                reject(new Error(`Failed to parse response: ${errorMessage}`));
+            }
         });
 
         process.on('error', (error) => {
