@@ -466,8 +466,8 @@ async function getMetadataTypes(useCache: boolean = true, token?: vscode.Cancell
   const json = await runSfJson<SfListMetadataTypes>(['org', 'list', 'metadata-types'], cwd, token);
   const types = json.result?.metadataObjects ?? [];
 
-  // Always cache
-  if (currentOrgId) {
+  // Cache only if enabled
+  if (cachingEnabled && currentOrgId) {
     metadataTypesCache = { orgId: currentOrgId, metadataTypes: types, ts: Date.now() };
     await saveMetadataTypesToDisk(metadataTypesCache);
   }
