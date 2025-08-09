@@ -2,7 +2,7 @@
     "name": "nakodx-retrieve-file",
     "displayName": "NAKODX Retrieve File from Server",
     "description": "Quickly retrieve Salesforce metadata files from server",
-    "version": "0.0.11",
+    "version": "0.0.12",
     "engines": {
         "vscode": "^1.74.0"
     },
@@ -33,6 +33,18 @@
                 "title": "NAKODX: Retrieve File from Server - Clear Items Cache"
             }
         ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "nakodx.deleteTypesCache",
+                    "when": "config.nakodx-file-retriever.enableCache"
+                },
+                {
+                    "command": "nakodx.deleteItemsCache",
+                    "when": "config.nakodx-file-retriever.enableCache"
+                }
+            ]
+        },
         "configuration": {
             "title": "NAKODX File Retriever",
             "properties": {
@@ -40,6 +52,18 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Automatically open files in the editor after downloading them from the server"
+                },
+                "nakodx-file-retriever.enableCache": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable in-memory and on-disk caching of metadata types and items. Disable to always fetch fresh data."
+                },
+                "nakodx-file-retriever.cacheTtlDays": {
+                    "type": "number",
+                    "default": 30,
+                    "minimum": 1,
+                    "maximum": 30,
+                    "description": "Cache time-to-live (TTL) in days (1-30) for metadata types and items."
                 }
             }
         }

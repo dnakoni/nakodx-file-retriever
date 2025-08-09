@@ -10,15 +10,15 @@
 - Use the command `NAKODX: Retrieve File from Server` to rapidly select and download any metadata type (e.g., `ApexClass`, `LightningComponentBundle`) directly from your Salesforce org.
 - The extension provides an intuitive interface where you can start typing the metadata type or item name to quickly filter the results.
 
-### Caching for Performance
-- Metadata types and their items are cached per Salesforce org. This caching ensures faster retrieval on subsequent requests, significantly enhancing performance when working with large orgs.
+### Caching for Performance (Optional)
+- Metadata types and their items are (optionally) cached per Salesforce org for faster subsequent retrievals. You can disable caching or tune its retention period in settings (see Configuration below).
 
 ### Cache Management
-- The extension includes cache management commands:
+- When caching is enabled, the extension adds commands to clear cached data for the current org:
   - **Clear Types Cache:** `NAKODX: Retrieve File from Server - Clear Types Cache`
   - **Clear Items Cache:** `NAKODX: Retrieve File from Server - Clear Items Cache`
 
-These commands allow you to manually refresh caches to retrieve the latest metadata from your Salesforce org.
+Disabling caching in settings instantly removes all in-memory and on-disk cache files and hides the above cache-clearing commands from the Command Palette.
 
 ---
 
@@ -53,5 +53,21 @@ The selected metadata file will be downloaded and opened in your workspace autom
 ---
 
 ## Support and Feedback
+---
+
+## Configuration
+
+Open VS Code Settings (UI or settings.json) and search for "NAKODX File Retriever".
+
+| Setting | Key | Default | Range | Description |
+|---------|-----|---------|-------|-------------|
+| Auto Open After Download | `nakodx-file-retriever.autoOpenAfterDownload` | `true` | n/a | Automatically opens the first retrieved file (non `-meta.xml` if present). |
+| Enable Cache | `nakodx-file-retriever.enableCache` | `true` | n/a | Toggles all metadata caching. When set to `false`, all existing cache files are immediately deleted and cache clear commands are hidden. |
+| Cache TTL (Days) | `nakodx-file-retriever.cacheTtlDays` | `30` | `1–30` | Number of days cached metadata remains valid. Older entries are refetched on demand. |
+
+Notes:
+- Changing TTL or toggling caching takes effect immediately; no reload needed.
+- If you frequently switch orgs or need always-fresh lists, disable caching.
+
 
 For issues, feedback, or feature requests, please open an issue on the project's repository.

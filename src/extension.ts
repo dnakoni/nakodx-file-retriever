@@ -56,7 +56,8 @@ type SfRetrieve = {
  * ===== Globals =====
  */
 const SF_BIN = process.platform === 'win32' ? 'sf.cmd' : 'sf';
-const TTL_MS = 24 * 60 * 60 * 1000; // 24h TTL for caches
+// TTL is now dynamic (1-30 days) based on user configuration. Default is 30 days, matching package.json default.
+let TTL_MS = 30 * 24 * 60 * 60 * 1000; // will be updated from settings on activation & config change
 
 let metadataTypesCache: CachedMetadataTypes | null = null;
 let metadataItemsCache: Map<string, CachedMetadataItems> = new Map();
@@ -352,6 +353,16 @@ export async function activate(context: vscode.ExtensionContext) {
   output.show(true);
   logInfo('NAKODX extension activating…');
 
+  // Initialize TTL from user settings
+  applyConfigSettings();
+
+  // React to configuration changes
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
+    if (e.affectsConfiguration('nakodx-file-retriever.cacheTtlDays') || e.affectsConfiguration('nakodx-file-retriever.enableCache')) {
+      applyConfigSettings();
+    }
+  }));
+
   initializeCacheDirectory(context);
   await loadAllCachesFromDisk();
 
@@ -429,6 +440,10 @@ async function retrieveFileFromServer(useCache: boolean = true) {
  * ===== Data providers =====
  */
 async function getMetadataTypes(useCache: boolean = true, token?: vscode.CancellationToken): Promise<MetadataType[]> {
+  // Respect global cache enable setting
+  const config = vscode.workspace.getConfiguration('nakodx-file-retriever');
+  const cachingEnabled = Boolean(config.get('enableCache', true));
+  if (!cachingEnabled) useCache = false;
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
   if (!workspaceFolder) throw new Error('No workspace folder open');
   const cwd = workspaceFolder.uri.fsPath;
@@ -461,6 +476,8 @@ async function getMetadataTypes(useCache: boolean = true, token?: vscode.Cancell
 }
 
 async function getMetadataItems(metadataType: string, token?: vscode.CancellationToken): Promise<MetadataItem[]> {
+  const config = vscode.workspace.getConfiguration('nakodx-file-retriever');
+  const cachingEnabled = Boolean(config.get('enableCache', true));
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
   if (!workspaceFolder) throw new Error('No workspace folder open');
   const cwd = workspaceFolder.uri.fsPath;
@@ -468,8 +485,8 @@ async function getMetadataItems(metadataType: string, token?: vscode.Cancellatio
   const currentOrgId = await getCurrentOrgId();
   const cacheKey = currentOrgId ? `${currentOrgId}:${metadataType}` : undefined;
 
-  // Memory cache
-  if (cacheKey) {
+  // Memory cache (only if enabled)
+  if (cacheKey && cachingEnabled) {
     const cached = metadataItemsCache.get(cacheKey);
     if (cached && isFresh(cached.ts)) return cached.items;
 
@@ -488,7 +505,7 @@ async function getMetadataItems(metadataType: string, token?: vscode.Cancellatio
     const json = await runSfJson<SfListMetadata>(['org', 'list', 'metadata', '-m', metadataType], cwd, token);
     const items = json.result ?? [];
 
-    if (cacheKey && currentOrgId) {
+  if (cachingEnabled && cacheKey && currentOrgId) {
       const cacheData: CachedMetadataItems = {
         orgId: currentOrgId,
         metadataType,
@@ -502,11 +519,44 @@ async function getMetadataItems(metadataType: string, token?: vscode.Cancellatio
     return items;
   })();
 
-  if (cacheKey) inflightItems.set(cacheKey, fetchPromise);
+  if (cacheKey && cachingEnabled) inflightItems.set(cacheKey, fetchPromise);
   try {
     return await fetchPromise;
   } finally {
-    if (cacheKey) inflightItems.delete(cacheKey);
+    if (cacheKey && cachingEnabled) inflightItems.delete(cacheKey);
+  }
+}
+
+/** Apply user configuration for TTL and potentially purge caches if disabled */
+function applyConfigSettings() {
+  const config = vscode.workspace.getConfiguration('nakodx-file-retriever');
+  const days = Math.min(30, Math.max(1, Number(config.get('cacheTtlDays', 30))));
+  TTL_MS = days * 24 * 60 * 60 * 1000;
+  const cachingEnabled = Boolean(config.get('enableCache', true));
+  logInfo(`Cache settings applied. Enabled=${cachingEnabled} TTL_DAYS=${days}`);
+  if (!cachingEnabled) {
+    metadataTypesCache = null;
+    metadataItemsCache.clear();
+    // Remove on-disk cache files as well
+    try {
+      if (cacheDirectory && fs.existsSync(cacheDirectory)) {
+        const files = fs.readdirSync(cacheDirectory);
+        let deleted = 0;
+        for (const f of files) {
+          if (f.startsWith('metadata-types-') || f.startsWith('metadata-items-')) {
+            try {
+              fs.unlinkSync(path.join(cacheDirectory, f));
+              deleted++;
+            } catch (e) {
+              logWarn(`Failed deleting cache file ${f}: ${String(e)}`);
+            }
+          }
+        }
+        logInfo(`Disk cache cleared (${deleted} file(s) removed).`);
+      }
+    } catch (e) {
+      logWarn(`Error while clearing disk cache: ${String(e)}`);
+    }
   }
 }
 
