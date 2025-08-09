@@ -2,7 +2,7 @@
     "name": "nakodx-retrieve-file",
     "displayName": "NAKODX Retrieve File from Server",
     "description": "Quickly retrieve Salesforce metadata files from server",
-    "version": "0.0.10",
+    "version": "0.0.11",
     "engines": {
         "vscode": "^1.74.0"
     },
